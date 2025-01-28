@@ -7,7 +7,7 @@ import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css' // 可以选择其他主题样式
 
 interface Message {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
 }
 
@@ -77,6 +77,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [currentLLM, setCurrentLLM] = useState('deepseek')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -101,7 +102,8 @@ export default function ChatPage() {
           messages: [...messages, newMessage].map(msg => ({
             role: msg.role,
             content: msg.content
-          }))
+          })),
+          llm: currentLLM
         })
       })
 
@@ -139,7 +141,14 @@ export default function ChatPage() {
             </svg>
           </Link>
           <h1 className="text-xl font-semibold text-gray-900">AI 助手</h1>
-          <div className="w-6"></div> {/* 为了保持标题居中 */}
+          <select
+            value={currentLLM}
+            onChange={(e) => setCurrentLLM(e.target.value)}
+            className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          >
+            <option value="deepseek">Deepseek</option>
+            <option value="openai">ChatGPT</option>
+          </select>
         </div>
       </header>
 

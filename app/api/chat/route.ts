@@ -1,39 +1,68 @@
 import { NextResponse } from 'next/server'
 
-// const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY
-const DEEPSEEK_API_KEY = 'sk-d432325978774686930b67b3c861c873'
-const API_URL = 'https://api.deepseek.com/v1/chat/completions'  // 请根据实际的 Deepseek API 端点调整
+// LLM 配置
+const LLM_CONFIG = {
+  deepseek: {
+    apiKey: 'sk-d432325978774686930b67b3c861c873',
+    apiUrl: 'https://api.deepseek.com/v1/chat/completions',
+    model: 'deepseek-chat',
+  },
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY,
+    apiUrl: 'https://api.openai.com/v1/chat/completions',
+    model: 'gpt-3.5-turbo',
+  }
+}
 
-export async function POST(request: Request) {
-  if (!DEEPSEEK_API_KEY) {
-    return NextResponse.json(
-      { error: 'Deepseek API key not configured' },
-      { status: 500 }
-    )
+// 统一的消息接口
+interface Message {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+}
+
+// 选择使用的 LLM
+const CURRENT_LLM = 'deepseek' // 可以改为 'openai'
+
+async function callLLMApi(messages: Message[], llm = CURRENT_LLM) {
+  const config = LLM_CONFIG[llm as keyof typeof LLM_CONFIG]
+  if (!config) {
+    throw new Error('Unsupported LLM')
   }
 
+  const response = await fetch(config.apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages: messages,
+      temperature: 0.7,
+      max_tokens: 2000,
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error?.message || 'API request failed')
+  }
+
+  return response.json()
+}
+
+export async function POST(request: Request) {
   try {
-    const { messages } = await request.json()
+    const { messages, llm = CURRENT_LLM } = await request.json()
 
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',  // 根据实际的模型名称调整
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 2000,
-      }),
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error(data.error?.message || 'API request failed')
+    // 添加系统提示信息
+    const systemMessage: Message = {
+      role: 'system',
+      content: '你是一个有帮助的AI助手。请用简洁、专业的方式回答问题。'
     }
+
+    const allMessages = [systemMessage, ...messages]
+    const data = await callLLMApi(allMessages, llm)
 
     return NextResponse.json(data)
   } catch (error) {
