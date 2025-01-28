@@ -4,14 +4,14 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  basePath: '/ai-chat',
-  assetPrefix: '/ai-chat',
+  basePath: '/AIChat',
+  assetPrefix: '/AIChat',
   trailingSlash: true,
   async redirects() {
     return [
       {
         source: '/404',
-        destination: '/ai-chat/404',
+        destination: '/AIChat/404',
         permanent: true,
       },
     ]
