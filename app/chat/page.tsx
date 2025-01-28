@@ -9,6 +9,8 @@ import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css' // 可以选择其他主题样式
+import { formatDistanceToNow } from 'date-fns'
+import { zhCN } from 'date-fns/locale'
 
 interface Message {
   role: 'user' | 'assistant' | 'system'
@@ -120,19 +122,39 @@ export default function ChatPage() {
     }
   }
 
+  const loadMessages = async (conversationId: string) => {
+    try {
+      const messagesRef = collection(db, `conversations/${conversationId}/messages`);
+      const q = query(messagesRef, orderBy('createdAt', 'asc'));
+      const querySnapshot = await getDocs(q);
+      const loadedMessages = querySnapshot.docs.map(doc => ({
+        role: doc.data().role,
+        content: doc.data().content
+      })) as Message[];
+      setMessages(loadedMessages);
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    }
+  };
+
+  const handleConversationSelect = async (conversationId: string) => {
+    setCurrentConversationId(conversationId);
+    await loadMessages(conversationId);
+  };
+
   const createNewConversation = async () => {
-    if (!auth.currentUser) return
+    if (!auth.currentUser) return;
 
     const docRef = await addDoc(collection(db, 'conversations'), {
       userId: auth.currentUser.uid,
       title: '新对话',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    })
-    setCurrentConversationId(docRef.id)
-    setMessages([])
-    await loadConversations(auth.currentUser.uid)
-  }
+    });
+    setCurrentConversationId(docRef.id);
+    setMessages([]);
+    await loadConversations(auth.currentUser.uid);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -166,7 +188,7 @@ export default function ChatPage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch('/ai-chat/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -227,12 +249,18 @@ export default function ChatPage() {
           {conversations.map(conv => (
             <button
               key={conv.id}
-              onClick={() => setCurrentConversationId(conv.id)}
-              className={`w-full px-4 py-2 text-left rounded ${
-                currentConversationId === conv.id ? 'bg-gray-700' : 'hover:bg-gray-700'
+              onClick={() => handleConversationSelect(conv.id)}
+              className={`w-full px-4 py-2 text-left rounded hover:bg-gray-700 ${
+                currentConversationId === conv.id ? 'bg-gray-700' : ''
               }`}
             >
-              {conv.title}
+              <div className="truncate">{conv.title}</div>
+              <div className="text-xs text-gray-400 mt-1">
+                {formatDistanceToNow(new Date(conv.createdAt), {
+                  addSuffix: true,
+                  locale: zhCN
+                })}
+              </div>
             </button>
           ))}
         </div>
