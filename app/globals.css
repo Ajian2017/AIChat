@@ -2,6 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 自定义样式用于 markdown 内容 */
+.prose pre {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.prose code {
+  background-color: rgb(243 244 246);
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
+}
+
+.prose pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+/* 暗色模式样式 */
+.dark .prose code {
+  background-color: rgb(31 41 55);
+  color: rgb(229 231 235);
+}
+
+/* 调整代码块的滚动条样式 */
+.prose pre::-webkit-scrollbar {
+  height: 8px;
+}
+
+.prose pre::-webkit-scrollbar-track {
+  background: rgb(243 244 246);
+  border-radius: 4px;
+}
+
+.prose pre::-webkit-scrollbar-thumb {
+  background: rgb(209 213 219);
+  border-radius: 4px;
+}
+
+.prose pre::-webkit-scrollbar-thumb:hover {
+  background: rgb(156 163 175);
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
