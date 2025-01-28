@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { auth, db } from '../lib/firebase'
-import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { createUserWithEmailAndPassword, AuthError } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -23,8 +23,9 @@ export default function RegisterPage() {
         createdAt: new Date().toISOString()
       })
       router.push('/chat')
-    } catch (error: any) {
-      setError('注册失败：' + error.message)
+    } catch (error) {
+      const firebaseError = error as AuthError
+      setError('注册失败：' + firebaseError.message)
     }
   }
 

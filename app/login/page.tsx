@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { auth } from '../lib/firebase'
-import { signInWithEmailAndPassword } from 'firebase/auth'
+import { signInWithEmailAndPassword, AuthError } from 'firebase/auth'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -17,8 +17,9 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password)
       router.push('/chat')
-    } catch (error: any) {
-      setError('登录失败：' + error.message)
+    } catch (error) {
+      const firebaseError = error as AuthError
+      setError('登录失败：' + firebaseError.message)
     }
   }
 
