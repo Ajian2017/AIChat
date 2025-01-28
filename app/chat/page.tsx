@@ -6,73 +6,69 @@ import { auth, db } from '../lib/firebase'
 import { collection, addDoc, query, where, orderBy, getDocs, doc, updateDoc } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import Link from 'next/link'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { Components } from 'react-markdown'
 import hljs from 'highlight.js'
-import 'highlight.js/styles/github.css' // 可以选择其他主题样式
+import 'highlight.js/styles/github.css'
 import { formatDistanceToNow } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
+import type { ComponentPropsWithoutRef } from 'react'
 
 interface Message {
   role: 'user' | 'assistant' | 'system'
   content: string
 }
 
+interface Conversation {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  userId: string
+}
+
+// 定义代码块组件的属性类型
+type CodeProps = ComponentPropsWithoutRef<'code'> & {
+  inline?: boolean
+}
+
 // 自定义 Markdown 消息组件
 function MarkdownMessage({ content }: { content: string }) {
+  const components: Components = {
+    code: (props: CodeProps) => {
+      const { inline, className, children, ...rest } = props
+      const match = /language-(\w+)/.exec(className || '')
+      const language = match ? match[1] : ''
+      const codeContent = Array.isArray(children) ? children.join('') : children?.toString() || ''
+      
+      if (!inline && language) {
+        const highlighted = hljs.highlight(codeContent, {
+          language,
+          ignoreIllegals: true
+        }).value
+        
+        return (
+          <pre className="!mt-2 !mb-2">
+            <code
+              className={`hljs language-${language} block overflow-x-auto p-3 rounded-lg bg-gray-100 dark:bg-gray-800`}
+              dangerouslySetInnerHTML={{ __html: highlighted }}
+              {...rest}
+            />
+          </pre>
+        )
+      }
+      
+      return (
+        <code className="px-1 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800" {...rest}>
+          {children}
+        </code>
+      )
+    }
+  }
+
   return (
     <ReactMarkdown
       className="prose prose-sm max-w-none dark:prose-invert"
-      components={{
-        // 自定义代码块渲染
-        code({ node, inline, className, children, ...props }) {
-          const match = /language-(\w+)/.exec(className || '')
-          const language = match ? match[1] : ''
-          
-          if (!inline && language) {
-            const highlighted = hljs.highlight(children.toString(), {
-              language,
-              ignoreIllegals: true
-            }).value
-            
-            return (
-              <pre className="!mt-2 !mb-2">
-                <code
-                  className={`hljs language-${language} block overflow-x-auto p-3 rounded-lg bg-gray-100 dark:bg-gray-800`}
-                  dangerouslySetInnerHTML={{ __html: highlighted }}
-                  {...props}
-                />
-              </pre>
-            )
-          }
-          
-          return (
-            <code className="px-1 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800" {...props}>
-              {children}
-            </code>
-          )
-        },
-        // 自定义段落渲染
-        p({ children }) {
-          return <p className="mb-2 last:mb-0">{children}</p>
-        },
-        // 自定义列表渲染
-        ul({ children }) {
-          return <ul className="list-disc ml-4 mb-2">{children}</ul>
-        },
-        ol({ children }) {
-          return <ol className="list-decimal ml-4 mb-2">{children}</ol>
-        },
-        // 自定义标题渲染
-        h1({ children }) {
-          return <h1 className="text-xl font-bold mb-2">{children}</h1>
-        },
-        h2({ children }) {
-          return <h2 className="text-lg font-bold mb-2">{children}</h2>
-        },
-        h3({ children }) {
-          return <h3 className="text-base font-bold mb-2">{children}</h3>
-        }
-      }}
+      components={components}
     >
       {content}
     </ReactMarkdown>
@@ -84,7 +80,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [currentLLM, setCurrentLLM] = useState('deepseek')
-  const [conversations, setConversations] = useState<any[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const router = useRouter()
 
@@ -102,7 +98,6 @@ export default function ChatPage() {
 
   const loadConversations = async (userId: string) => {
     try {
-      // 首先只按 userId 查询
       const q = query(
         collection(db, 'conversations'),
         where('userId', '==', userId)
@@ -111,8 +106,7 @@ export default function ChatPage() {
       const convs = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }))
-      // 在客户端进行排序
+      })) as Conversation[]
       convs.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       })

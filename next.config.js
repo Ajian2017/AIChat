@@ -6,6 +6,7 @@ const nextConfig = {
   },
   basePath: '/ai-chat',
   assetPrefix: '/ai-chat',
+  trailingSlash: true,
   async redirects() {
     return [
       {
