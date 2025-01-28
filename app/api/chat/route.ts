@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 // LLM 配置
 const LLM_CONFIG = {
   deepseek: {
-    apiKey: 'sk-d432325978774686930b67b3c861c873',
+    apiKey: process.env.DEEPSEEK_API_KEY,
     apiUrl: 'https://api.deepseek.com/v1/chat/completions',
     model: 'deepseek-chat',
   },
