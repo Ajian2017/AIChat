@@ -1,12 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
   images: {
     unoptimized: true,
   },
   basePath: '/AIChat',
   assetPrefix: '/AIChat',
   trailingSlash: true,
+  experimental: {
+    appDir: true
+  },
   async redirects() {
     return [
       {
