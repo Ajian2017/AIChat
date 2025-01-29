@@ -182,7 +182,7 @@ export default function ChatPage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch('/AIChat/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -197,10 +197,17 @@ export default function ChatPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to get AI response')
+        const errorData = await response.json().catch(() => ({ error: 'Network response was not ok' }))
+        throw new Error(errorData.error || 'Failed to get AI response')
       }
 
-      const data = await response.json()
+      const data = await response.json().catch(() => {
+        throw new Error('Invalid JSON response from server')
+      })
+      if (!data.choices?.[0]?.message?.content) {
+        throw new Error('Invalid response format')
+      }
+
       const aiResponse: Message = {
         role: 'assistant',
         content: data.choices[0].message.content
@@ -222,7 +229,7 @@ export default function ChatPage() {
       console.error('Error:', error)
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: '抱歉，发生了一些错误。请稍后再试。'
+        content: error instanceof Error ? error.message : '抱歉，发生了一些错误。请稍后再试。'
       }])
     } finally {
       setIsLoading(false)

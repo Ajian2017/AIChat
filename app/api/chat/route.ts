@@ -23,32 +23,44 @@ interface Message {
 // 选择使用的 LLM
 const CURRENT_LLM = 'deepseek' // 可以改为 'openai'
 
-async function callLLMApi(messages: Message[], llm = CURRENT_LLM) {
+async function callLLMApi(messages: any[], llm = CURRENT_LLM) {
   const config = LLM_CONFIG[llm as keyof typeof LLM_CONFIG]
   if (!config) {
     throw new Error('Unsupported LLM')
   }
 
-  const response = await fetch(config.apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages: messages,
-      temperature: 0.7,
-      max_tokens: 2000,
-    }),
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error?.message || 'API request failed')
+  if (!config.apiKey) {
+    throw new Error('API key not configured')
   }
 
-  return response.json()
+  try {
+    const response = await fetch(config.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 2000,
+      }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Invalid JSON response' }))
+      console.error('LLM API Error:', error)
+      throw new Error(error.error?.message || 'API request failed')
+    }
+
+    return response.json().catch(() => {
+      throw new Error('Invalid JSON response from LLM API')
+    })
+  } catch (error) {
+    console.error('API Call Error:', error)
+    throw error
+  }
 }
 
 export async function POST(request: Request) {
@@ -56,7 +68,7 @@ export async function POST(request: Request) {
     const { messages, llm = CURRENT_LLM } = await request.json()
 
     // 添加系统提示信息
-    const systemMessage: Message = {
+    const systemMessage = {
       role: 'system',
       content: '你是一个有帮助的AI助手。请用简洁、专业的方式回答问题。'
     }
@@ -68,7 +80,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Chat API Error:', error)
     return NextResponse.json(
-      { error: 'Failed to get AI response' },
+      { error: error instanceof Error ? error.message : 'Failed to get AI response' },
       { status: 500 }
     )
   }
