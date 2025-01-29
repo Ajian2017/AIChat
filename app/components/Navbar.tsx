@@ -48,6 +48,26 @@ export default function Navbar() {
                 >
                   音视频合成
                 </Link>
+                <Link
+                  href="/extract"
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${
+                    pathname === '/extract' || pathname === '/AIChat/extract'
+                      ? 'text-indigo-600 bg-indigo-50'
+                      : 'text-gray-700 hover:text-indigo-600 hover:bg-indigo-50'
+                  }`}
+                >
+                  提取音频
+                </Link>
+                <Link
+                  href="/merge"
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${
+                    pathname === '/merge' || pathname === '/AIChat/merge'
+                      ? 'text-indigo-600 bg-indigo-50'
+                      : 'text-gray-700 hover:text-indigo-600 hover:bg-indigo-50'
+                  }`}
+                >
+                  合并音视频
+                </Link>
                 <button
                   onClick={() => auth.signOut()}
                   className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-indigo-50"
