@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
@@ -21,5 +21,12 @@ console.log('Firebase Config:', {
 })
 
 const app = initializeApp(firebaseConfig)
-export const auth = getAuth(app)
+const auth = getAuth(app)
+// 设置持久化认证
+setPersistence(auth, browserLocalPersistence)
+  .catch((error) => {
+    console.error('Auth persistence error:', error)
+  })
+
+export { auth }
 export const db = getFirestore(app) 

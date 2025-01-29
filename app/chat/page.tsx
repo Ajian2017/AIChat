@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { auth, db } from '../lib/firebase'
-import { collection, addDoc, query, where, orderBy, getDocs, doc, updateDoc } from 'firebase/firestore'
+import { collection, addDoc, query, where, orderBy, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import Link from 'next/link'
 import ReactMarkdown, { Components } from 'react-markdown'
@@ -85,6 +85,12 @@ export default function ChatPage() {
   const router = useRouter()
 
   useEffect(() => {
+    // 检查当前认证状态
+    const currentUser = auth.currentUser
+    if (currentUser) {
+      loadConversations(currentUser.uid)
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         router.push('/login')
@@ -98,6 +104,7 @@ export default function ChatPage() {
 
   const loadConversations = async (userId: string) => {
     try {
+      console.log('Loading conversations for user:', userId)
       const q = query(
         collection(db, 'conversations'),
         where('userId', '==', userId)
@@ -113,6 +120,9 @@ export default function ChatPage() {
       setConversations(convs)
     } catch (error) {
       console.error('Error loading conversations:', error)
+      if (error instanceof Error) {
+        console.error('Error details:', error.message)
+      }
     }
   }
 
@@ -236,10 +246,40 @@ export default function ChatPage() {
     }
   }
 
+  const handleDeleteConversation = async (conversationId: string, e: React.MouseEvent) => {
+    e.stopPropagation() // 阻止事件冒泡
+    if (!window.confirm('确定要删除这个会话吗？')) return
+
+    try {
+      // 删除会话中的所有消息
+      const messagesRef = collection(db, `conversations/${conversationId}/messages`)
+      const messagesSnapshot = await getDocs(messagesRef)
+      const deletePromises = messagesSnapshot.docs.map(doc => deleteDoc(doc.ref))
+      await Promise.all(deletePromises)
+
+      // 删除会话本身
+      await deleteDoc(doc(db, 'conversations', conversationId))
+
+      // 如果删除的是当前会话，清空消息
+      if (currentConversationId === conversationId) {
+        setCurrentConversationId(null)
+        setMessages([])
+      }
+
+      // 重新加载会话列表
+      if (auth.currentUser) {
+        await loadConversations(auth.currentUser.uid)
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error)
+      alert('删除会话失败，请重试')
+    }
+  }
+
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen overflow-hidden">
       {/* 侧边栏 */}
-      <div className="w-64 bg-gray-800 text-white p-4">
+      <div className="hidden md:block w-64 bg-gray-800 text-white p-4 overflow-y-auto">
         <button
           onClick={createNewConversation}
           className="w-full px-4 py-2 mb-4 bg-indigo-600 text-white rounded hover:bg-indigo-700"
@@ -255,12 +295,24 @@ export default function ChatPage() {
                 currentConversationId === conv.id ? 'bg-gray-700' : ''
               }`}
             >
-              <div className="truncate">{conv.title}</div>
-              <div className="text-xs text-gray-400 mt-1">
-                {formatDistanceToNow(new Date(conv.createdAt), {
-                  addSuffix: true,
-                  locale: zhCN
-                })}
+              <div className="flex justify-between items-start">
+                <div className="flex-1 min-w-0">
+                  <div className="truncate">{conv.title}</div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {formatDistanceToNow(new Date(conv.createdAt), {
+                      addSuffix: true,
+                      locale: zhCN
+                    })}
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => handleDeleteConversation(conv.id, e)}
+                  className="ml-2 p-1 text-gray-400 hover:text-red-500 rounded-full hover:bg-gray-700 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               </div>
             </button>
           ))}
@@ -273,6 +325,14 @@ export default function ChatPage() {
         <header className="bg-white shadow-sm">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div className="flex items-center space-x-4">
+              <button
+                className="md:hidden text-gray-600 hover:text-gray-900"
+                onClick={() => document.body.classList.toggle('sidebar-open')}
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
               <Link href="/" className="text-gray-900 hover:text-gray-600">
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -300,14 +360,14 @@ export default function ChatPage() {
         </header>
 
         {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        <div className="flex-1 overflow-y-auto px-2 sm:px-4 py-4 sm:py-6 space-y-4">
           {messages.map((message, index) => (
             <div
               key={index}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} max-w-full`}
             >
               <div
-                className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                className={`max-w-[90%] sm:max-w-[80%] rounded-lg px-3 sm:px-4 py-2 ${
                   message.role === 'user'
                     ? 'bg-indigo-600 text-white'
                     : 'bg-white text-gray-900 shadow-sm'
@@ -332,19 +392,19 @@ export default function ChatPage() {
 
         {/* Input Form */}
         <div className="border-t bg-white p-4">
-          <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex gap-4">
+          <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex gap-2 sm:gap-4">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="输入您的问题..."
-              className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="flex-1 rounded-lg border border-gray-300 px-3 sm:px-4 py-2 text-sm sm:text-base"
               disabled={isLoading}
             />
             <button
               type="submit"
               disabled={isLoading}
-              className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+              className="bg-indigo-600 text-white px-4 sm:px-6 py-2 rounded-lg text-sm sm:text-base whitespace-nowrap"
             >
               发送
             </button>
