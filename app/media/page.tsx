@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { auth } from '../lib/firebase'
-import { FFmpeg } from '@ffmpeg/ffmpeg'
-import { fetchFile } from '@ffmpeg/util'
 
 export default function MediaPage() {
   const [audioFile, setAudioFile] = useState<File | null>(null)
@@ -12,11 +12,22 @@ export default function MediaPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [outputBlob, setOutputBlob] = useState<Blob | null>(null)
   const [progress, setProgress] = useState<string>('')
+  const [ffmpeg, setFfmpeg] = useState<any>(null)
+  const [ffmpegLoaded, setFfmpegLoaded] = useState(false)
   const router = useRouter()
 
-  // 初始化 FFmpeg
-  const ffmpeg = new FFmpeg()
-  let ffmpegLoaded = false
+  useEffect(() => {
+    const loadFFmpeg = async () => {
+      if (typeof window === 'undefined') return
+      try {
+        const FFmpeg = (await import('@ffmpeg/ffmpeg')).FFmpeg
+        setFfmpeg(new FFmpeg())
+      } catch (error) {
+        console.error('Failed to load FFmpeg:', error)
+      }
+    }
+    loadFFmpeg()
+  }, [])
 
   const handleAudioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -33,23 +44,33 @@ export default function MediaPage() {
   }
 
   const handleDownload = () => {
-    if (!outputBlob) return
-    const url = URL.createObjectURL(outputBlob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `合成视频_${Date.now()}.mp4`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    if (typeof window === 'undefined' || !outputBlob) return
+
+    const downloadFile = () => {
+      const url = URL.createObjectURL(outputBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `合成视频_${Date.now()}.mp4`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
+
+    // 确保在客户端执行
+    if (typeof window !== 'undefined') {
+      downloadFile()
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!audioFile || !videoFile || isLoading) return
+    if (!audioFile || !videoFile || isLoading || !ffmpeg) return
 
     setIsLoading(true)
     try {
+      const { fetchFile } = await import('@ffmpeg/util')
+
       // 检查文件大小
       const MAX_SIZE = 100 * 1024 * 1024 // 100MB
       if (audioFile.size > MAX_SIZE || videoFile.size > MAX_SIZE) {
@@ -60,7 +81,7 @@ export default function MediaPage() {
       if (!ffmpegLoaded) {
         setProgress('加载 FFmpeg...')
         await ffmpeg.load()
-        ffmpegLoaded = true
+        setFfmpegLoaded(true)
       }
 
       setProgress('处理文件...')

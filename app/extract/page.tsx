@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { FFmpeg } from '@ffmpeg/ffmpeg'
-import { fetchFile } from '@ffmpeg/util'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect } from 'react'
 
 export default function ExtractPage() {
   const [videoFiles, setVideoFiles] = useState<File[]>([])
@@ -11,9 +11,21 @@ export default function ExtractPage() {
   const [completedCount, setCompletedCount] = useState(0)
   const [audioBlobs, setAudioBlobs] = useState<{ name: string; blob: Blob }[]>([])
 
-  // 初始化 FFmpeg
-  const ffmpeg = new FFmpeg()
-  let ffmpegLoaded = false
+  const [ffmpeg, setFfmpeg] = useState<any>(null)
+  const [ffmpegLoaded, setFfmpegLoaded] = useState(false)
+
+  useEffect(() => {
+    const loadFFmpeg = async () => {
+      if (typeof window === 'undefined') return
+      try {
+        const FFmpeg = (await import('@ffmpeg/ffmpeg')).FFmpeg
+        setFfmpeg(new FFmpeg())
+      } catch (error) {
+        console.error('Failed to load FFmpeg:', error)
+      }
+    }
+    loadFFmpeg()
+  }, [])
 
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -21,32 +33,43 @@ export default function ExtractPage() {
   }
 
   const handleDownloadAll = () => {
+    if (typeof window === 'undefined') return
+
     audioBlobs.forEach(({ name, blob }) => {
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = name
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      const downloadFile = () => {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = name
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
+
+      // 确保在客户端执行
+      if (typeof window !== 'undefined') {
+        downloadFile()
+      }
     })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!videoFiles.length || isLoading) return
+    if (!videoFiles.length || isLoading || !ffmpeg) return
 
     setIsLoading(true)
     setCompletedCount(0)
     setAudioBlobs([])
     
     try {
+      const { fetchFile } = await import('@ffmpeg/util')
+
       // 加载 FFmpeg
       if (!ffmpegLoaded) {
         setProgress('加载 FFmpeg...')
         await ffmpeg.load()
-        ffmpegLoaded = true
+        setFfmpegLoaded(true)
       }
 
       // 处理每个视频文件
