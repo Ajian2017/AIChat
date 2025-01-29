@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@tailwindcss/typography": "^0.5.16",
     "date-fns": "^4.1.0",
     "firebase": "^11.2.0",
